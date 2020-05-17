@@ -1,3 +1,4 @@
+import json
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -9,11 +10,12 @@ app = dash.Dash()
 
 producer = KafkaProducer(bootstrap_servers='localhost:9092')
 
-add_consumer = KafkaConsumer('add_res', bootstrap_servers='localhost:9092',auto_offset_reset='earliest',group_id="test-consumer-group")#,auto_offset_reset='earliest',group_id="test-consumer-group",enable_auto_commit=True)
+add_consumer = KafkaConsumer('add_res', bootstrap_servers='localhost:9092',auto_offset_reset='earliest',group_id="test-consumer-group")
 
-sub_consumer = KafkaConsumer('sub_res', bootstrap_servers='localhost:9092',auto_offset_reset='earliest',group_id="test-consumer-group")#,auto_offset_reset='earliest',group_id="test-consumer-group",enable_auto_commit=True)
+sub_consumer = KafkaConsumer('sub_res', bootstrap_servers='localhost:9092',auto_offset_reset='earliest',group_id="test-consumer-group")
 
-mul_consumer = KafkaConsumer('mul_res', bootstrap_servers='localhost:9092',auto_offset_reset='earliest',group_id="test-consumer-group")#,auto_offset_reset='earliest',group_id="test-consumer-group",enable_auto_commit=True)
+mul_consumer = KafkaConsumer('mul_res', bootstrap_servers='localhost:9092',auto_offset_reset='earliest',group_id="test-consumer-group")
+
 
 app.layout = html.Div(children=[
     html.H1(children='Hello Kafka', style={
@@ -31,92 +33,91 @@ app.layout = html.Div(children=[
     html.Br(),
     html.Br(),
     html.Hr(),
-    html.Button('Addition', id='add',n_clicks=0),
-    html.Button('Substraction', id='sub',n_clicks=0),
-    html.Button('Multiplication', id='mul',n_clicks=0),
-    html.Br(),
-    html.Br(),
-    html.Hr(),
-    html.Div(id='display-result'),
-    html.Div(id='display-result1'),
-    html.Div(id='display-result2')
+    html.Button('Addition', id='add'),
+    html.Button('Substraction', id='sub'),
+    html.Button('Multiplication', id='mul'),
+    html.Div(id='container')
 ])
 
 
-@app.callback(Output('display-result', 'children'), [Input('add', 'n_clicks')],[
+@app.callback(Output('container', 'children'),
+              [Input('add', 'n_clicks'),
+               Input('sub', 'n_clicks'),
+               Input('mul', 'n_clicks')],[
     State('input-num1', 'value'),
     State('input-num2', 'value')
 ])
-def update_output(n_clicks, value1,value2):
-    if  n_clicks :
-        if  value1.isdigit() and value2.isdigit():
-            producer_input_str = value1+","+value2
-            in_msg = value1+"+"+value2
-            producer_input = bytes(producer_input_str, "UTF-8")
-            producer.send('add_nums', producer_input)
-            print('++++++++++++++++++++++++++++++++++   add-res  +++++++++++++++++++++++++++++++++++++++++++')
-            for message in add_consumer:
-                print(message.value)
-                sum = message.value.decode()
-                msg,sum = sum.split('::')
-                if in_msg == msg:
-                    return 'The input value was "{}" and "{}" the sum is {}'.format(
-                    value1, value2, sum)
-        else:
-            return 'The input is not valid'
+def display(btn1, btn2, btn3,value1,valu2):
+    ctx = dash.callback_context
+    result = None
+    ctx_msg = json.dumps({
+        'states': ctx.states,
+        'triggered': ctx.triggered,
+        'inputs': ctx.inputs
+    }, indent=2)
+
+    if not ctx.triggered:
+        button_id = 'No clicks yet'
     else:
-        return None
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        if button_id == 'add':
+            if ctx.states["input-num1.value"].isdigit() and ctx.states["input-num2.value"].isdigit():
+                num1 = ctx.states["input-num1.value"]
+                num2 = ctx.states["input-num2.value"]
+                producer_input_str = num1+","+num2
+                in_msg = num1+"+"+num2
+                producer_input = bytes(producer_input_str, "UTF-8")
+                producer.send('add_nums', producer_input)
+                print('++++++++++++++++++++++++++++++++++   add-res  +++++++++++++++++++++++++++++++++++++++++++')
+                for message in add_consumer:
+                    print(message.value)
+                    sum = message.value.decode()
+                    msg,sum = sum.split('::')
+                    if in_msg == msg:
+                        result ='The input value was "{}" and "{}" the sum is {}'.format(
+                        num1, num2, sum)
+                        return html.Div([html.H1(result)])
+            pass
+        if button_id == 'sub':
+            if ctx.states["input-num1.value"].isdigit() and ctx.states["input-num2.value"].isdigit():
+                num1 = ctx.states["input-num1.value"]
+                num2 = ctx.states["input-num2.value"]
+                print(num1,num2)
+                producer_input_str = num1+","+num2
+                in_msg = num1+"-"+num2
+                producer_input = bytes(producer_input_str, "UTF-8")
+                producer.send('sub_nums', producer_input)
+                print('++++++++++++++++++++++++++++++++++   sub-res  +++++++++++++++++++++++++++++++++++++++++++')
+                for message in sub_consumer:
+                    print(message.value)
+                    sub = message.value.decode()
+                    msg,sub = sub.split('::')
+                    if in_msg == msg:
+                        result ='The input value was "{}" and "{}" the substraction is {}'.format(
+                        num1, num2, sub)
+                        return html.Div([html.H1(result)])
+            pass
+        if button_id == 'mul':
+            if ctx.states["input-num1.value"].isdigit() and ctx.states["input-num2.value"].isdigit():
+                num1 = ctx.states["input-num1.value"]
+                num2 = ctx.states["input-num2.value"]
+                print(num1,num2)
+                producer_input_str = num1+","+num2
+                in_msg = num1+"*"+num2
+                producer_input = bytes(producer_input_str, "UTF-8")
+                producer.send('mul_nums', producer_input)
+                print('++++++++++++++++++++++++++++++++++   mul-res  +++++++++++++++++++++++++++++++++++++++++++')
+                for message in mul_consumer:
+                    print(message.value)
+                    mul = message.value.decode()
+                    msg,mul = mul.split('::')
+                    if in_msg == msg:
+                        result ='The input value was "{}" and "{}" the multiplication is {}'.format(
+                        num1, num2, mul)
+                        return html.Div([html.H1(result)])
+            pass
 
-
-
-@app.callback(Output('display-result1', 'children'),[Input('sub', 'n_clicks')],[
-    State('input-num1', 'value'),
-    State('input-num2', 'value')
-])
-def update_output(n_clicks, value1, value2):
-    if n_clicks:
-        if value1.isdigit() and value2.isdigit():
-            producer_input_str = value1+","+value2
-            in_msg = value1+"-"+value2
-            producer_input = bytes(producer_input_str, "UTF-8")
-            producer.send('sub_nums', producer_input)
-            print("---------------------------------  sub-test -------------------------------------")
-            for message in sub_consumer:
-                print(message.value)
-                sub = message.value.decode()
-                msg,sub = sub.split('::')
-                if in_msg == msg:
-                    return 'The input value was "{}" and "{}" the substraction is {}'.format(
-                    value1, value2, sub)
-        else:
-            return 'The input is not valid'
-    else:
-        return None
-
-
-@app.callback(Output('display-result2', 'children'),[Input('mul', 'n_clicks')],[
-    State('input-num1', 'value'),
-    State('input-num2', 'value')
-])
-def update_output(n_clicks, value1, value2):
-    if n_clicks:
-        if value1.isdigit() and value2.isdigit():
-            producer_input_str = value1+","+value2
-            in_msg = value1+"*"+value2
-            producer_input = bytes(producer_input_str, "UTF-8")
-            producer.send('mul_nums', producer_input)
-            print("**********************  mul-test  ************************************")
-            for message in mul_consumer:
-                print(message.value)
-                mul = message.value.decode()
-                msg,mul = mul.split('::')
-                if in_msg == msg:
-                    return 'The input value was "{}" and "{}" the multiplication is {}'.format(
-                    value1, value2, mul)
-        else:
-            return 'The input is not valid'
-    else:
-        return None
+    return html.Div([html.H1(result)])
 
 
 if __name__ == '__main__':
