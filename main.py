@@ -11,14 +11,31 @@ app = dash.Dash()
 
 producer = KafkaProducer(bootstrap_servers='localhost:9092')
 
-add_consumer = KafkaConsumer(bootstrap_servers='localhost:9092',auto_offset_reset='earliest',group_id="1",enable_auto_commit='True')
-add_consumer.subscribe(['add_res'])
+add_consumer = KafkaConsumer(bootstrap_servers='localhost:9092',auto_offset_reset='earliest')
+topic_partition = TopicPartition('add_res', 0)
+add_consumer.assign([topic_partition])
 
-sub_consumer = KafkaConsumer(bootstrap_servers='localhost:9092',auto_offset_reset='earliest',group_id="1",enable_auto_commit='True')
-sub_consumer.subscribe(['sub_res'])
+last_offset = add_consumer.end_offsets([topic_partition])[topic_partition]
+add_consumer.seek(topic_partition, last_offset)
 
-mul_consumer = KafkaConsumer(bootstrap_servers='localhost:9092',auto_offset_reset='earliest',group_id="1",enable_auto_commit='True')
-mul_consumer.subscribe(['mul_res'])
+
+#add_consumer.seek_to_end(topic_partition)
+
+sub_consumer = KafkaConsumer(bootstrap_servers='localhost:9092',auto_offset_reset='earliest')
+topic_partition = TopicPartition('sub_res', 0)
+sub_consumer.assign([topic_partition])
+
+last_offset = sub_consumer.end_offsets([topic_partition])[topic_partition]
+sub_consumer.seek(topic_partition, last_offset)
+#sub_consumer.seek_to_end(topic_partition)
+
+mul_consumer = KafkaConsumer(bootstrap_servers='localhost:9092',auto_offset_reset='earliest')
+topic_partition = TopicPartition('mul_res', 0)
+mul_consumer.assign([topic_partition])
+
+last_offset = mul_consumer.end_offsets([topic_partition])[topic_partition]
+mul_consumer.seek(topic_partition, last_offset)
+#mul_consumer.seek_to_end(topic_partition)
 
 
 app.layout = html.Div(children=[
@@ -73,15 +90,10 @@ def display(btn1, btn2, btn3,value1,valu2):
 
             if button_id == 'add':
                 producer.send('add_nums', producer_input)
-                producer.flush()
+                #producer.flush()
                 print('++++++++++++++++++++++++++++++++++   add-res  +++++++++++++++++++++++++++++++++++++++++++')
                 for message in add_consumer:
-                    tp = TopicPartition(message.topic, message.partition)
-                    offsets = {tp: OffsetAndMetadata(message.offset, None)}
-                    add_consumer.seek_to_end(tp)
-                    last_offset = add_consumer.position(tp)
-                    add_consumer.commit(offsets=offsets)
-                    print(message.value)
+                
                     sum = message.value.decode()
                     result ='The input value was "{}" and "{}" the sum is {}'.format(
                     num1, num2, sum)
@@ -89,15 +101,9 @@ def display(btn1, btn2, btn3,value1,valu2):
 
             if button_id == 'sub':
                 producer.send('sub_nums', producer_input)
-                producer.flush()
+               # producer.flush()
                 print('++++++++++++++++++++++++++++++++++   sub-res  +++++++++++++++++++++++++++++++++++++++++++')
                 for message in sub_consumer:
-                    tp = TopicPartition(message.topic, message.partition)
-                    offsets = {tp: OffsetAndMetadata(message.offset, None)}
-                    sub_consumer.seek_to_end(tp)
-                    last_offset = sub_consumer.position(tp)
-                    sub_consumer.commit(offsets=offsets)
-                    print(message.value)
                     diff = message.value.decode()
                     result ='The input value was "{}" and "{}" the diff is {}'.format(
                     num1, num2, diff)
@@ -108,12 +114,6 @@ def display(btn1, btn2, btn3,value1,valu2):
                 producer.flush()
                 print('++++++++++++++++++++++++++++++++++   mul-res  +++++++++++++++++++++++++++++++++++++++++++')
                 for message in mul_consumer:
-                    tp = TopicPartition(message.topic, message.partition)
-                    offsets = {tp: OffsetAndMetadata(message.offset, None)}
-                    mul_consumer.seek_to_end(tp)
-                    last_offset = mul_consumer.position(tp)
-                    mul_consumer.commit(offsets=offsets)
-                    print(message.value)
                     mul = message.value.decode()
                     result ='The input value was "{}" and "{}" the mul is {}'.format(
                     num1, num2, mul)
